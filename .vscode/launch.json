@@ -7,7 +7,9 @@
       "request": "launch",
       "preLaunchTask": "build (KernelSyntaxExamples)",
       "program": "${workspaceFolder}/dotnet/samples/KernelSyntaxExamples/bin/Debug/net6.0/KernelSyntaxExamples.dll",
-      "args": [],
+      "args": [
+        /*"example0"*/
+      ],
       "cwd": "${workspaceFolder}/dotnet/samples/KernelSyntaxExamples",
       "console": "internalConsole",
       "stopAtEntry": false
