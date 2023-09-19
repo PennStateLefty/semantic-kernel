@@ -16,8 +16,6 @@ public static class Example09_FunctionTypes
     {
         Console.WriteLine("======== Native function types ========");
 
-        var fakeContext = new SKContext(loggerFactory: ConsoleLogger.LoggerFactory);
-
         var kernel = Kernel.Builder
             .WithLoggerFactory(ConsoleLogger.LoggerFactory)
             .WithOpenAIChatCompletionService(TestConfiguration.OpenAI.ChatModelId, TestConfiguration.OpenAI.ApiKey)
@@ -28,6 +26,8 @@ public static class Example09_FunctionTypes
 
         string folder = RepoFiles.SampleSkillsPath();
         kernel.ImportSemanticSkillFromDirectory(folder, "SummarizeSkill");
+
+        var fakeContext = new SKContext(skills: kernel.Skills, loggerFactory: ConsoleLogger.LoggerFactory);
 
         // The kernel takes care of wiring the input appropriately
         await kernel.RunAsync(
