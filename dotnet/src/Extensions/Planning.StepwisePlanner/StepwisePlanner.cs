@@ -69,7 +69,7 @@ public class StepwisePlanner : IStepwisePlanner
         this._promptRenderer = new PromptTemplateEngine(this._kernel.LoggerFactory);
 
         // Import native functions
-        this._nativeFunctions = this._kernel.ImportPlugin(this, RestrictedPluginName);
+        this._nativeFunctions = this._kernel.ImportFunctions(this, RestrictedPluginName);
 
         // Create context and logger
         this._logger = this._kernel.LoggerFactory.CreateLogger(this.GetType());
@@ -552,8 +552,8 @@ public class StepwisePlanner : IStepwisePlanner
         {
             return this._kernel.Functions.GetFunction(pluginName, functionName);
         };
-        var getPluginFunction = this.Config.GetPluginFunction ?? getFunction;
-        var function = getPluginFunction(targetFunction.PluginName, targetFunction.Name);
+        var getFunctionCallback = this.Config.GetFunctionCallback ?? getFunction;
+        var function = getFunctionCallback(targetFunction.PluginName, targetFunction.Name);
         return function;
     }
 
