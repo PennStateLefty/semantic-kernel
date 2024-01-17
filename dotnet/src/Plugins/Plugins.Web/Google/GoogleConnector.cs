@@ -9,7 +9,6 @@ using Google.Apis.CustomSearchAPI.v1;
 using Google.Apis.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.SemanticKernel.Diagnostics;
 
 namespace Microsoft.SemanticKernel.Plugins.Web.Google;
 
@@ -53,7 +52,7 @@ public sealed class GoogleConnector : IWebSearchEngineConnector, IDisposable
 
         this._search = new CustomSearchAPIService(initializer);
         this._searchEngineId = searchEngineId;
-        this._logger = loggerFactory is not null ? loggerFactory.CreateLogger(typeof(GoogleConnector)) : NullLogger.Instance;
+        this._logger = loggerFactory?.CreateLogger(typeof(GoogleConnector)) ?? NullLogger.Instance;
     }
 
     /// <inheritdoc/>
@@ -63,11 +62,15 @@ public sealed class GoogleConnector : IWebSearchEngineConnector, IDisposable
         int offset,
         CancellationToken cancellationToken)
     {
-        if (count <= 0) { throw new ArgumentOutOfRangeException(nameof(count)); }
+        if (count is <= 0 or > 10)
+        {
+            throw new ArgumentOutOfRangeException(nameof(count), count, $"{nameof(count)} value must be must be greater than 0 and less than or equals 10.");
+        }
 
-        if (count > 10) { throw new ArgumentOutOfRangeException(nameof(count), $"{nameof(count)} value must be between 0 and 10, inclusive."); }
-
-        if (offset < 0) { throw new ArgumentOutOfRangeException(nameof(offset)); }
+        if (offset < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(offset));
+        }
 
         var search = this._search.Cse.List();
         search.Cx = this._searchEngineId;

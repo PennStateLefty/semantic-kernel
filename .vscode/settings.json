@@ -71,7 +71,8 @@
     "**/Thumbs.db": true
   },
   "cSpell.words": [
-    "Partitioner"
+    "Partitioner",
+    "SKEXP"
   ],
   "[java]": {
     "editor.formatOnSave": false,
@@ -91,10 +92,9 @@
   "java.debug.settings.onBuildFailureProceed": true,
   "java.compile.nullAnalysis.mode": "disabled",
   "dotnet.defaultSolution": "dotnet\\SK-dotnet.sln",
-  "azureFunctions.projectSubpath": "samples/dotnet/KernelHttpServer",
-  "azureFunctions.deploySubpath": "samples/dotnet/KernelHttpServer/bin/Release/net6.0/publish",
-  "azureFunctions.projectLanguage": "C#",
-  "azureFunctions.projectRuntime": "~4",
-  "debug.internalConsoleOptions": "neverOpen",
-  "azureFunctions.preDeployTask": "publish (functions)"
+  "python.testing.pytestArgs": [
+    "python/tests"
+  ],
+  "python.testing.unittestEnabled": false,
+  "python.testing.pytestEnabled": true
 }

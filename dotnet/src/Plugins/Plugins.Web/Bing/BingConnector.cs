@@ -11,7 +11,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.SemanticKernel.Diagnostics;
+using Microsoft.SemanticKernel.Http;
 
 namespace Microsoft.SemanticKernel.Plugins.Web.Bing;
 
@@ -30,7 +30,7 @@ public sealed class BingConnector : IWebSearchEngineConnector
     /// <param name="apiKey">The API key to authenticate the connector.</param>
     /// <param name="loggerFactory">The <see cref="ILoggerFactory"/> to use for logging. If null, no logging will be performed.</param>
     public BingConnector(string apiKey, ILoggerFactory? loggerFactory = null) :
-        this(apiKey, new HttpClient(NonDisposableHttpClientHandler.Instance, false), loggerFactory)
+        this(apiKey, HttpClientProvider.GetHttpClient(), loggerFactory)
     {
     }
 
@@ -45,19 +45,23 @@ public sealed class BingConnector : IWebSearchEngineConnector
         Verify.NotNull(httpClient);
 
         this._apiKey = apiKey;
-        this._logger = loggerFactory is not null ? loggerFactory.CreateLogger(typeof(BingConnector)) : NullLogger.Instance;
+        this._logger = loggerFactory?.CreateLogger(typeof(BingConnector)) ?? NullLogger.Instance;
         this._httpClient = httpClient;
-        this._httpClient.DefaultRequestHeaders.Add("User-Agent", Telemetry.HttpUserAgent);
+        this._httpClient.DefaultRequestHeaders.Add("User-Agent", HttpHeaderValues.UserAgent);
     }
 
     /// <inheritdoc/>
     public async Task<IEnumerable<string>> SearchAsync(string query, int count = 1, int offset = 0, CancellationToken cancellationToken = default)
     {
-        if (count <= 0) { throw new ArgumentOutOfRangeException(nameof(count)); }
+        if (count is <= 0 or >= 50)
+        {
+            throw new ArgumentOutOfRangeException(nameof(count), count, $"{nameof(count)} value must be greater than 0 and less than 50.");
+        }
 
-        if (count >= 50) { throw new ArgumentOutOfRangeException(nameof(count), $"{nameof(count)} value must be less than 50."); }
-
-        if (offset < 0) { throw new ArgumentOutOfRangeException(nameof(offset)); }
+        if (offset < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(offset));
+        }
 
         Uri uri = new($"https://api.bing.microsoft.com/v7.0/search?q={Uri.EscapeDataString(query)}&count={count}&offset={offset}");
 

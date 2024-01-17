@@ -11,10 +11,10 @@ using Kusto.Cloud.Platform.Utils;
 using Kusto.Data;
 using Kusto.Data.Common;
 using Kusto.Data.Net.Client;
-using Microsoft.SemanticKernel.Diagnostics;
+using Microsoft.SemanticKernel.Http;
 using Microsoft.SemanticKernel.Memory;
 
-namespace Microsoft.SemanticKernel.Connectors.Memory.Kusto;
+namespace Microsoft.SemanticKernel.Connectors.Kusto;
 
 /// <summary>
 /// An implementation of <see cref="IMemoryStore"/> backed by a Kusto database.
@@ -320,14 +320,14 @@ public class KustoMemoryStore : IMemoryStore, IDisposable
 
     #region private ================================================================================
 
-    private Disposer _disposer;
-    private object _lock = new();
+    private readonly Disposer _disposer;
+    private readonly object _lock = new();
 
-    private string _database;
+    private readonly string _database;
 
     private static ClientRequestProperties GetClientRequestProperties() => new()
     {
-        Application = Telemetry.HttpUserAgent,
+        Application = HttpHeaderValues.UserAgent,
     };
 
     private bool _searchInitialized;
