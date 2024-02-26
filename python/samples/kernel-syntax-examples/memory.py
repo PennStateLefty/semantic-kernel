@@ -5,6 +5,8 @@ from typing import Tuple
 
 import semantic_kernel as sk
 import semantic_kernel.connectors.ai.open_ai as sk_oai
+from semantic_kernel.contents.chat_history import ChatHistory
+from semantic_kernel.functions.kernel_arguments import KernelArguments
 
 
 async def populate_memory(kernel: sk.Kernel) -> None:
@@ -31,9 +33,10 @@ async def search_memory_examples(kernel: sk.Kernel) -> None:
         print(f"Answer: {result[0].text}\n")
 
 
+# TODO fix this ASAP
 async def setup_chat_with_memory(
     kernel: sk.Kernel,
-) -> Tuple[sk.KernelFunctionBase, sk.KernelContext]:
+) -> Tuple[sk.KernelFunction, sk.KernelContext]:
     sk_prompt = """
     ChatBot can have a conversation with you about any topic.
     It can give explicit instructions or say 'I don't know' if
@@ -61,17 +64,16 @@ async def setup_chat_with_memory(
     context["fact5"] = "what do I do for work?"
 
     context[sk.core_plugins.TextMemoryPlugin.COLLECTION_PARAM] = "aboutMe"
-    context[sk.core_plugins.TextMemoryPlugin.RELEVANCE_PARAM] = 0.8
+    context[sk.core_plugins.TextMemoryPlugin.RELEVANCE_PARAM] = "0.8"
 
     context["chat_history"] = ""
 
     return chat_func, context
 
 
-async def chat(kernel: sk.Kernel, chat_func: sk.KernelFunctionBase, context: sk.KernelContext) -> bool:
+async def chat(kernel: sk.Kernel, chat_func: sk.KernelFunction, chat_history: ChatHistory) -> bool:
     try:
         user_input = input("User:> ")
-        context["user_input"] = user_input
     except KeyboardInterrupt:
         print("\n\nExiting chat...")
         return False
@@ -83,8 +85,9 @@ async def chat(kernel: sk.Kernel, chat_func: sk.KernelFunctionBase, context: sk.
         print("\n\nExiting chat...")
         return False
 
-    answer = await kernel.run(chat_func, input_vars=context.variables)
-    context["chat_history"] += f"\nUser:> {user_input}\nChatBot:> {answer}\n"
+    answer = await kernel.invoke(chat_func, KernelArguments(user_input=user_input, chat_history=chat_history))
+    chat_history.add_user_message(user_input)
+    chat_history.add_assistant_message(str(answer))
 
     print(f"ChatBot:> {answer}")
     return True
@@ -94,13 +97,17 @@ async def main() -> None:
     kernel = sk.Kernel()
 
     api_key, org_id = sk.openai_settings_from_dot_env()
-    kernel.add_chat_service("chat-gpt", sk_oai.OpenAIChatCompletion("gpt-3.5-turbo", api_key, org_id))
-    kernel.add_text_embedding_generation_service(
-        "ada", sk_oai.OpenAITextEmbedding("text-embedding-ada-002", api_key, org_id)
+    service_id = "chat-gpt"
+    kernel.add_service(
+        sk_oai.OpenAIChatCompletion(service_id=service_id, ai_model_id="gpt-3.5-turbo", api_key=api_key, org_id=org_id)
     )
+    embedding_gen = sk_oai.OpenAITextEmbedding(
+        service_id="ada", ai_model_id="text-embedding-ada-002", api_key=api_key, org_id=org_id
+    )
+    kernel.add_service(embedding_gen)
 
-    kernel.register_memory_store(memory_store=sk.memory.VolatileMemoryStore())
-    kernel.import_plugin(sk.core_plugins.TextMemoryPlugin())
+    kernel.use_memory(storage=sk.memory.VolatileMemoryStore(), embeddings_generator=embedding_gen)
+    kernel.import_plugin(sk.core_plugins.TextMemoryPlugin(), "TextMemoryPlugin")
 
     print("Populating memory...")
     await populate_memory(kernel)
