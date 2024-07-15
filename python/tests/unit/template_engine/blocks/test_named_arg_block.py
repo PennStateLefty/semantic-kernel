@@ -4,9 +4,9 @@ import logging
 
 from pytest import mark, raises
 
+from semantic_kernel.exceptions import NamedArgBlockSyntaxError
 from semantic_kernel.functions.kernel_arguments import KernelArguments
 from semantic_kernel.kernel import Kernel
-from semantic_kernel.template_engine.blocks.block_errors import NamedArgBlockSyntaxError
 from semantic_kernel.template_engine.blocks.block_types import BlockTypes
 from semantic_kernel.template_engine.blocks.named_arg_block import NamedArgBlock
 from semantic_kernel.template_engine.blocks.val_block import ValBlock
@@ -48,10 +48,7 @@ def test_type_property():
     ids=["no_name", "invalid_var", "invalid_val", "empty_val", "empty_var"],
 )
 def test_syntax_error(content):
-    if "$" in content:
-        match = content.replace("$", r"\$")
-    else:
-        match = content
+    match = content.replace("$", "\\$") if "$" in content else content
     with raises(NamedArgBlockSyntaxError, match=rf".*{match}.*"):
         NamedArgBlock(content=content)
 

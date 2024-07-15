@@ -6,6 +6,7 @@ import pytest
 
 from semantic_kernel import Kernel
 from semantic_kernel.core_plugins.http_plugin import HttpPlugin
+from semantic_kernel.exceptions import FunctionExecutionException
 from semantic_kernel.functions.kernel_arguments import KernelArguments
 
 
@@ -19,11 +20,11 @@ async def test_it_can_be_instantiated():
 async def test_it_can_be_imported():
     kernel = Kernel()
     plugin = HttpPlugin()
-    assert kernel.import_plugin_from_object(plugin, "http")
-    assert kernel.plugins["http"] is not None
-    assert kernel.plugins["http"].name == "http"
-    assert kernel.plugins["http"]["getAsync"] is not None
-    assert kernel.plugins["http"]["postAsync"] is not None
+    kernel.add_plugin(plugin, "http")
+    assert kernel.get_plugin(plugin_name="http") is not None
+    assert kernel.get_plugin(plugin_name="http").name == "http"
+    assert kernel.get_function(plugin_name="http", function_name="getAsync") is not None
+    assert kernel.get_function(plugin_name="http", function_name="postAsync") is not None
 
 
 @patch("aiohttp.ClientSession.get")
@@ -38,9 +39,17 @@ async def test_get(mock_get):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("method", ["get", "post", "put", "delete"])
+async def test_fail_no_url(method):
+    plugin = HttpPlugin()
+    with pytest.raises(FunctionExecutionException):
+        await getattr(plugin, method)(url='')
+
+
+@pytest.mark.asyncio
 async def test_get_none_url():
     plugin = HttpPlugin()
-    with pytest.raises(ValueError):
+    with pytest.raises(FunctionExecutionException):
         await plugin.get(None)
 
 

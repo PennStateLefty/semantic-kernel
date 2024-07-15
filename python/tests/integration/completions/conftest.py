@@ -1,20 +1,13 @@
 # Copyright (c) Microsoft. All rights reserved.
 
-import sys
 
 import pytest
 
-from semantic_kernel.connectors.ai.prompt_execution_settings import PromptExecutionSettings
-from semantic_kernel.prompt_template.prompt_template_config import PromptTemplateConfig
-
-if sys.version_info >= (3, 9):
-    import semantic_kernel.connectors.ai.google_palm as sk_gp
+from semantic_kernel.kernel import Kernel
 
 
 @pytest.fixture(scope="function")
-def setup_tldr_function_for_oai_models(create_kernel):
-    kernel = create_kernel
-
+def setup_tldr_function_for_oai_models(kernel: Kernel):
     # Define semantic function using SK prompt template language
     prompt = """
     {{$input}}
@@ -42,8 +35,7 @@ def setup_tldr_function_for_oai_models(create_kernel):
 
 
 @pytest.fixture(scope="function")
-def setup_summarize_conversation_using_plugin(create_kernel):
-    kernel = create_kernel
+def setup_summarize_conversation_using_plugin(kernel: Kernel):
     ChatTranscript = """John: Hello, how are you?
         Jane: I'm fine, thanks. How are you?
         John: I'm doing well, writing some example code.
@@ -83,31 +75,3 @@ def setup_summarize_conversation_using_plugin(create_kernel):
         John: Yeah, that's a good idea."""
 
     yield kernel, ChatTranscript
-
-
-@pytest.fixture(scope="function")
-def setup_gp_text_completion_function(create_kernel, get_gp_config):
-    kernel = create_kernel
-    api_key = get_gp_config
-    # Configure LLM service
-    palm_text_completion = sk_gp.GooglePalmTextCompletion(ai_model_id="models/text-bison-001", api_key=api_key)
-    kernel.add_service(palm_text_completion)
-
-    # Define semantic function using SK prompt template language
-    prompt = "Hello, I like {{$input}}{{$input2}}"
-
-    exec_settings = PromptExecutionSettings(
-        service_id="models/text-bison-001", extension_data={"max_tokens": 200, "temperature": 0, "top_p": 0.5}
-    )
-
-    prompt_template_config = PromptTemplateConfig(template=prompt, execution_settings=exec_settings)
-
-    # Create the semantic function
-    text2text_function = kernel.create_function_from_prompt(
-        function_name="hello", plugin_name="plugin", prompt_template_config=prompt_template_config
-    )
-
-    # User input
-    simple_input = "sleeping and "
-
-    yield kernel, text2text_function, simple_input

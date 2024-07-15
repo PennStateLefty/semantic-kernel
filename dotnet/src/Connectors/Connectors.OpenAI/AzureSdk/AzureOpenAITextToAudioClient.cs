@@ -1,6 +1,5 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
-using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Net.Http;
@@ -15,7 +14,7 @@ namespace Microsoft.SemanticKernel.Connectors.OpenAI;
 /// <summary>
 /// Azure OpenAI text-to-audio client for HTTP operations.
 /// </summary>
-[Experimental("SKEXP0005")]
+[Experimental("SKEXP0001")]
 internal sealed class AzureOpenAITextToAudioClient
 {
     private readonly ILogger _logger;
@@ -29,7 +28,7 @@ internal sealed class AzureOpenAITextToAudioClient
     /// <summary>
     /// Storage for AI service attributes.
     /// </summary>
-    internal Dictionary<string, object?> Attributes { get; } = new();
+    internal Dictionary<string, object?> Attributes { get; } = [];
 
     /// <summary>
     /// Creates an instance of the <see cref="AzureOpenAITextToAudioClient"/> with API key auth.
@@ -75,11 +74,9 @@ internal sealed class AzureOpenAITextToAudioClient
 
         using var request = this.GetRequest(text, modelId, audioExecutionSettings);
         using var response = await this.SendRequestAsync(request, cancellationToken).ConfigureAwait(false);
-        using var stream = await response.Content.ReadAsStreamAndTranslateExceptionAsync().ConfigureAwait(false);
+        var data = await response.Content.ReadAsByteArrayAndTranslateExceptionAsync().ConfigureAwait(false);
 
-        var binaryData = await BinaryData.FromStreamAsync(stream, cancellationToken).ConfigureAwait(false);
-
-        return new List<AudioContent> { new(binaryData, modelId) };
+        return [new(data, modelId)];
     }
 
     internal void AddAttribute(string key, string? value)
