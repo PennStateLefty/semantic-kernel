@@ -462,6 +462,7 @@ env/
 venv/
 myvenv/
 ENV/
+.venv*/
 
 # Python dist
 dist/
