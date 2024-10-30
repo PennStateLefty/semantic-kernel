@@ -71,24 +71,30 @@
     "**/Thumbs.db": true
   },
   "cSpell.words": [
+    "Dapr",
     "Partitioner",
+    "Pregel",
     "Prompty",
-    "SKEXP"
+    "SKEXP",
+    "superstep",
+    "Supersteps",
+    "typeref",
+    "uninstantiated"
   ],
   "[java]": {
     "editor.formatOnSave": false,
     "editor.tabSize": 4,
     "editor.codeActionsOnSave": {
       "source.fixAll": "never"
-    },
+    }
   },
   "emeraldwalk.runonsave": {
     "commands": [
       {
         "match": "\\.java$",
         "cmd": "java -Xmx128m -jar ${workspaceFolder}/java/utilities/google-java-format-1.17.0-all-deps.jar --replace --aosp ${file}"
-      },
-    ],
+      }
+    ]
   },
   "java.debug.settings.onBuildFailureProceed": true,
   "java.compile.nullAnalysis.mode": "disabled",
@@ -97,11 +103,5 @@
     "python/tests"
   ],
   "python.testing.unittestEnabled": false,
-  "python.testing.pytestEnabled": true,
-  "[typescript][typescriptreact]": {
-    "editor.codeActionsOnSave": {
-      "source.organizeImports": "explicit",
-      "source.fixAll": "explicit"
-    }
-  }
+  "python.testing.pytestEnabled": true
 }

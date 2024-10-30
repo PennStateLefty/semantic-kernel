@@ -29,7 +29,7 @@ public class ChatHistorySummarizationReducer : IChatHistoryReducer
     /// </summary>
     public const string DefaultSummarizationPrompt =
         """
-        Provide a concise and complete summarizion of the entire dialog that does not exceed 5 sentences
+        Provide a concise and complete summarization of the entire dialog that does not exceed 5 sentences
 
         This summary must always:
         - Consider both user and assistant interactions
@@ -74,13 +74,13 @@ public class ChatHistorySummarizationReducer : IChatHistoryReducer
 
         IEnumerable<ChatMessageContent>? truncatedHistory = null;
 
-        if (truncationIndex > 0)
+        if (truncationIndex >= 0)
         {
             // Second pass to extract history for summarization
             IEnumerable<ChatMessageContent> summarizedHistory =
                 history.Extract(
                     this.UseSingleSummary ? 0 : insertionPoint,
-                    truncationIndex - 1,
+                    truncationIndex,
                     (m) => m.Items.Any(i => i is FunctionCallContent || i is FunctionResultContent));
 
             try

@@ -24,7 +24,7 @@ public partial class ClientCoreTests
     {
         // Act
         var logger = new Mock<ILogger<ClientCoreTests>>().Object;
-        var openAIClient = new OpenAIClient("key");
+        var openAIClient = new OpenAIClient(new ApiKeyCredential("key"));
 
         var clientCoreModelConstructor = new ClientCore("model1", "apiKey");
         var clientCoreOpenAIClientConstructor = new ClientCore("model1", openAIClient, logger: logger);
@@ -67,9 +67,9 @@ public partial class ClientCoreTests
         var clientCore = new ClientCore("model", "apiKey", endpoint: endpoint, httpClient: client);
 
         // Assert
-        Assert.Equal(endpoint ?? client?.BaseAddress ?? new Uri("https://api.openai.com/"), clientCore.Endpoint);
+        Assert.Equal(endpoint ?? client?.BaseAddress ?? new Uri("https://api.openai.com/v1"), clientCore.Endpoint);
         Assert.True(clientCore.Attributes.ContainsKey(AIServiceExtensions.EndpointKey));
-        Assert.Equal(endpoint?.ToString() ?? client?.BaseAddress?.ToString() ?? "https://api.openai.com/", clientCore.Attributes[AIServiceExtensions.EndpointKey]);
+        Assert.Equal(endpoint?.ToString() ?? client?.BaseAddress?.ToString() ?? "https://api.openai.com/v1", clientCore.Attributes[AIServiceExtensions.EndpointKey]);
 
         client?.Dispose();
     }
@@ -135,7 +135,7 @@ public partial class ClientCoreTests
     }
 
     [Fact]
-    public async Task ItDoNotAddSemanticKernelHeadersWhenOpenAIClientIsProvidedAsync()
+    public async Task ItDoesNotAddSemanticKernelHeadersWhenOpenAIClientIsProvidedAsync()
     {
         using HttpMessageHandlerStub handler = new();
         using HttpClient client = new(handler);
@@ -145,7 +145,7 @@ public partial class ClientCoreTests
         var clientCore = new ClientCore(
             modelId: "model",
             openAIClient: new OpenAIClient(
-                "test",
+                new ApiKeyCredential("test"),
                 new OpenAIClientOptions()
                 {
                     Transport = new HttpClientPipelineTransport(client),
@@ -169,7 +169,7 @@ public partial class ClientCoreTests
     [InlineData(null)]
     [InlineData("")]
     [InlineData("value")]
-    public void ItAddAttributesButDoesNothingIfNullOrEmpty(string? value)
+    public void ItAddsAttributesButDoesNothingIfNullOrEmpty(string? value)
     {
         // Arrange
         var clientCore = new ClientCore("model", "apikey");
@@ -190,14 +190,14 @@ public partial class ClientCoreTests
     }
 
     [Fact]
-    public void ItAddModelIdAttributeAsExpected()
+    public void ItAddsModelIdAttributeAsExpected()
     {
         // Arrange
         var expectedModelId = "modelId";
 
         // Act
         var clientCore = new ClientCore(expectedModelId, "apikey");
-        var clientCoreBreakingGlass = new ClientCore(expectedModelId, new OpenAIClient(" "));
+        var clientCoreBreakingGlass = new ClientCore(expectedModelId, new OpenAIClient(new ApiKeyCredential(" ")));
 
         // Assert
         Assert.True(clientCore.Attributes.ContainsKey(AIServiceExtensions.ModelIdKey));

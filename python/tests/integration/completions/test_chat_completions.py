@@ -1,6 +1,5 @@
 # Copyright (c) Microsoft. All rights reserved.
 
-import os
 import sys
 from functools import partial
 from typing import Any
@@ -12,35 +11,32 @@ from semantic_kernel.connectors.ai.prompt_execution_settings import PromptExecut
 from semantic_kernel.contents import ChatMessageContent, TextContent
 from semantic_kernel.contents.chat_history import ChatHistory
 from semantic_kernel.contents.utils.author_role import AuthorRole
-from tests.integration.completions.chat_completion_test_base import ChatCompletionTestBase
+from semantic_kernel.kernel_pydantic import KernelBaseModel
+from tests.integration.completions.chat_completion_test_base import (
+    ChatCompletionTestBase,
+    anthropic_setup,
+    mistral_ai_setup,
+    ollama_setup,
+    onnx_setup,
+    vertex_ai_setup,
+)
 from tests.integration.completions.completion_test_base import ServiceType
-from tests.integration.completions.test_utils import retry
+from tests.integration.test_utils import retry
 
 if sys.version_info >= (3, 12):
     from typing import override  # pragma: no cover
 else:
     from typing_extensions import override  # pragma: no cover
 
-mistral_ai_setup: bool = False
-try:
-    if os.environ["MISTRALAI_API_KEY"] and os.environ["MISTRALAI_CHAT_MODEL_ID"]:
-        mistral_ai_setup = True
-except KeyError:
-    mistral_ai_setup = False
 
-ollama_setup: bool = False
-try:
-    if os.environ["OLLAMA_MODEL"]:
-        ollama_setup = True
-except KeyError:
-    ollama_setup = False
+class Step(KernelBaseModel):
+    explanation: str
+    output: str
 
-anthropic_setup: bool = False
-try:
-    if os.environ["ANTHROPIC_API_KEY"] and os.environ["ANTHROPIC_CHAT_MODEL_ID"]:
-        anthropic_setup = True
-except KeyError:
-    anthropic_setup = False
+
+class Reasoning(KernelBaseModel):
+    steps: list[Step]
+    final_answer: str
 
 
 pytestmark = pytest.mark.parametrize(
@@ -55,6 +51,16 @@ pytestmark = pytest.mark.parametrize(
             ],
             {},
             id="openai_text_input",
+        ),
+        pytest.param(
+            "openai",
+            {"response_format": Reasoning},
+            [
+                ChatMessageContent(role=AuthorRole.USER, items=[TextContent(text="Hello")]),
+                ChatMessageContent(role=AuthorRole.USER, items=[TextContent(text="How are you today?")]),
+            ],
+            {},
+            id="openai_json_schema_response_format",
         ),
         pytest.param(
             "azure",
@@ -87,13 +93,24 @@ pytestmark = pytest.mark.parametrize(
             id="azure_ai_inference_text_input",
         ),
         pytest.param(
+            "anthropic",
+            {},
+            [
+                ChatMessageContent(role=AuthorRole.USER, items=[TextContent(text="Hello")]),
+                ChatMessageContent(role=AuthorRole.USER, items=[TextContent(text="How are you today?")]),
+            ],
+            {},
+            marks=pytest.mark.skipif(not anthropic_setup, reason="Anthropic Environment Variables not set"),
+            id="anthropic_text_input",
+        ),
+        pytest.param(
             "mistral_ai",
             {},
             [
                 ChatMessageContent(role=AuthorRole.USER, items=[TextContent(text="Hello")]),
                 ChatMessageContent(role=AuthorRole.USER, items=[TextContent(text="How are you today?")]),
             ],
-            ["Hello", "well"],
+            {},
             marks=pytest.mark.skipif(not mistral_ai_setup, reason="Mistral AI Environment Variables not set"),
             id="mistral_ai_text_input",
         ),
@@ -104,20 +121,20 @@ pytestmark = pytest.mark.parametrize(
                 ChatMessageContent(role=AuthorRole.USER, items=[TextContent(text="Hello")]),
                 ChatMessageContent(role=AuthorRole.USER, items=[TextContent(text="How are you today?")]),
             ],
-            ["Hello", "well"],
+            {},
             marks=pytest.mark.skipif(not ollama_setup, reason="Need local Ollama setup"),
             id="ollama_text_input",
         ),
-         pytest.param(
-            "anthropic",
+        pytest.param(
+            "onnx_gen_ai",
             {},
             [
                 ChatMessageContent(role=AuthorRole.USER, items=[TextContent(text="Hello")]),
                 ChatMessageContent(role=AuthorRole.USER, items=[TextContent(text="How are you today?")]),
             ],
-            ["Hello", "well"],
-            marks=pytest.mark.skipif(not anthropic_setup, reason="Anthropic Environment Variables not set"),
-            id="anthropic_text_input",
+            {},
+            marks=pytest.mark.skipif(not onnx_setup, reason="Need a Onnx Model setup"),
+            id="onnx_gen_ai",
         ),
         pytest.param(
             "google_ai",
@@ -126,7 +143,7 @@ pytestmark = pytest.mark.parametrize(
                 ChatMessageContent(role=AuthorRole.USER, items=[TextContent(text="Hello")]),
                 ChatMessageContent(role=AuthorRole.USER, items=[TextContent(text="How are you today?")]),
             ],
-            ["Hello", "well"],
+            {},
             marks=pytest.mark.skip(reason="Skipping due to 429s from Google AI."),
             id="google_ai_text_input",
         ),
@@ -137,8 +154,74 @@ pytestmark = pytest.mark.parametrize(
                 ChatMessageContent(role=AuthorRole.USER, items=[TextContent(text="Hello")]),
                 ChatMessageContent(role=AuthorRole.USER, items=[TextContent(text="How are you today?")]),
             ],
-            ["Hello", "well"],
+            {},
+            marks=pytest.mark.skipif(not vertex_ai_setup, reason="Vertex AI Environment Variables not set"),
             id="vertex_ai_text_input",
+        ),
+        pytest.param(
+            "bedrock_amazon_titan",
+            {},
+            [
+                ChatMessageContent(role=AuthorRole.USER, items=[TextContent(text="Hello")]),
+                ChatMessageContent(role=AuthorRole.USER, items=[TextContent(text="How are you today?")]),
+            ],
+            {},
+            id="bedrock_amazon_titan_text_input",
+        ),
+        pytest.param(
+            "bedrock_ai21labs",
+            {},
+            [
+                ChatMessageContent(role=AuthorRole.USER, items=[TextContent(text="Hello")]),
+                ChatMessageContent(role=AuthorRole.USER, items=[TextContent(text="How are you today?")]),
+            ],
+            {},
+            marks=pytest.mark.skip(reason="Skipping due to occasional throttling from Bedrock."),
+            id="bedrock_ai21labs_text_input",
+        ),
+        pytest.param(
+            "bedrock_anthropic_claude",
+            {},
+            [
+                ChatMessageContent(role=AuthorRole.USER, items=[TextContent(text="Hello")]),
+                ChatMessageContent(role=AuthorRole.USER, items=[TextContent(text="How are you today?")]),
+            ],
+            {},
+            marks=pytest.mark.skip(reason="Skipping due to occasional throttling from Bedrock."),
+            id="bedrock_anthropic_claude_text_input",
+        ),
+        pytest.param(
+            "bedrock_cohere_command",
+            {},
+            [
+                ChatMessageContent(role=AuthorRole.USER, items=[TextContent(text="Hello")]),
+                ChatMessageContent(role=AuthorRole.USER, items=[TextContent(text="How are you today?")]),
+            ],
+            {},
+            marks=pytest.mark.skip(reason="Skipping due to occasional throttling from Bedrock."),
+            id="bedrock_cohere_command_text_input",
+        ),
+        pytest.param(
+            "bedrock_meta_llama",
+            {},
+            [
+                ChatMessageContent(role=AuthorRole.USER, items=[TextContent(text="Hello")]),
+                ChatMessageContent(role=AuthorRole.USER, items=[TextContent(text="How are you today?")]),
+            ],
+            {},
+            marks=pytest.mark.skip(reason="Skipping due to occasional throttling from Bedrock."),
+            id="bedrock_meta_llama_text_input",
+        ),
+        pytest.param(
+            "bedrock_mistralai",
+            {},
+            [
+                ChatMessageContent(role=AuthorRole.USER, items=[TextContent(text="Hello")]),
+                ChatMessageContent(role=AuthorRole.USER, items=[TextContent(text="How are you today?")]),
+            ],
+            {},
+            marks=pytest.mark.skip(reason="Skipping due to occasional throttling from Bedrock."),
+            id="bedrock_mistralai_text_input",
         ),
     ],
 )

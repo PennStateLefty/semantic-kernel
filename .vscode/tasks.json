@@ -5,10 +5,7 @@
       "label": "setup (contributing-R#)",
       "detail": "",
       "group": "build",
-      "dependsOn": [
-        "new tool-manifest",
-        "# Setup"
-      ],
+      "dependsOn": ["new tool-manifest", "# Setup"],
       "dependsOrder": "sequence"
     },
     {
@@ -16,10 +13,7 @@
       "detail": "Install ReSharper Global Tools",
       "command": "dotnet",
       "type": "process",
-      "args": [
-        "new",
-        "tool-manifest"
-      ],
+      "args": ["new", "tool-manifest"],
       "options": {
         "cwd": "${workspaceFolder}/dotnet"
       }
@@ -113,10 +107,7 @@
       "label": "test (Semantic-Kernel)",
       "command": "dotnet",
       "type": "process",
-      "args": [
-        "test",
-        "SemanticKernel.UnitTests.csproj"
-      ],
+      "args": ["test", "SemanticKernel.UnitTests.csproj"],
       "problemMatcher": "$msCompile",
       "group": "test",
       "presentation": {
@@ -270,6 +261,39 @@
         "reveal": "always",
         "panel": "shared",
         "group": "PR-Validate"
+      }
+    },
+    {
+      "label": "build (ProcessWithDapr)",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "build",
+        "${workspaceFolder}/dotnet/samples/Demos/ProcessWithDapr/ProcessWithDapr.csproj",
+        "/property:GenerateFullPaths=true",
+        "/consoleloggerparameters:NoSummary",
+        "/property:DebugType=portable"
+      ],
+      "problemMatcher": "$msCompile",
+      "group": "build"
+    },
+    {
+      "label": "daprd-debug",
+      "type": "daprd",
+      "appId": "processwithdapr",
+      "logLevel": "debug",
+      "appPort": 5000,
+      "httpPort": 3500,
+      "dependsOn":["build (ProcessWithDapr)"]
+    },
+    {
+      "label": "dapr-down",
+      "type": "shell",
+      "command": ["dapr stop --app-id processwithdapr"],
+      "presentation": {
+        "clear": true,
+        "close": true,
+        "reveal": "never"
       }
     }
   ],
