@@ -1,13 +1,16 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Microsoft.SemanticKernel.Plugins.OpenApi;
 
 /// <summary>
 /// REST API specification.
 /// </summary>
-internal sealed class RestApiSpecification
+[Experimental("SKEXP0040")]
+public sealed class RestApiSpecification
 {
     /// <summary>
     /// The REST API information.
@@ -17,7 +20,7 @@ internal sealed class RestApiSpecification
     /// <summary>
     /// The REST API security requirements.
     /// </summary>
-    public List<RestApiSecurityRequirement>? SecurityRequirements { get; private set; }
+    public IList<RestApiSecurityRequirement>? SecurityRequirements { get; private set; }
 
     /// <summary>
     /// The REST API operations.
@@ -30,10 +33,28 @@ internal sealed class RestApiSpecification
     /// <param name="info">REST API information.</param>
     /// <param name="securityRequirements">REST API security requirements.</param>
     /// <param name="operations">REST API operations.</param>
-    public RestApiSpecification(RestApiInfo info, List<RestApiSecurityRequirement>? securityRequirements, IList<RestApiOperation> operations)
+    internal RestApiSpecification(RestApiInfo info, List<RestApiSecurityRequirement>? securityRequirements, IList<RestApiOperation> operations)
     {
         this.Info = info;
         this.SecurityRequirements = securityRequirements;
         this.Operations = operations;
+    }
+
+    internal void Freeze()
+    {
+        if (this.SecurityRequirements is not null)
+        {
+            this.SecurityRequirements = new ReadOnlyCollection<RestApiSecurityRequirement>(this.SecurityRequirements);
+            foreach (var securityRequirement in this.SecurityRequirements)
+            {
+                securityRequirement.Freeze();
+            }
+        }
+
+        this.Operations = new ReadOnlyCollection<RestApiOperation>(this.Operations);
+        foreach (var operation in this.Operations)
+        {
+            operation.Freeze();
+        }
     }
 }

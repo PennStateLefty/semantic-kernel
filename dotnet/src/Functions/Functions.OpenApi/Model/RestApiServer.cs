@@ -1,6 +1,7 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Diagnostics.CodeAnalysis;
 
 namespace Microsoft.SemanticKernel.Plugins.OpenApi;
@@ -23,7 +24,7 @@ public sealed class RestApiServer
     /// <summary>
     /// A map between a variable name and its value. The value is used for substitution in the server's URL template.
     /// </summary>
-    public IDictionary<string, RestApiServerVariable> Variables { get; }
+    public IDictionary<string, RestApiServerVariable> Variables { get; private set; }
 
     /// <summary>
     /// Construct a new <see cref="RestApiServer"/> object.
@@ -36,5 +37,17 @@ public sealed class RestApiServer
     {
         this.Url = string.IsNullOrEmpty(url) ? null : url;
         this.Variables = variables ?? new Dictionary<string, RestApiServerVariable>();
+    }
+
+    /// <summary>
+    /// Makes the current instance unmodifiable.
+    /// </summary>
+    internal void Freeze()
+    {
+        this.Variables = new ReadOnlyDictionary<string, RestApiServerVariable>(this.Variables);
+        foreach (var variable in this.Variables.Values)
+        {
+            variable.Freeze();
+        }
     }
 }

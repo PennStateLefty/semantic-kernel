@@ -1,6 +1,7 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Diagnostics.CodeAnalysis;
 
 namespace Microsoft.SemanticKernel.Plugins.OpenApi;
@@ -15,6 +16,21 @@ public sealed class RestApiPayloadProperty
     /// The property name.
     /// </summary>
     public string Name { get; }
+
+    /// <summary>
+    /// The property argument name.
+    /// If provided, the argument name will be used to search for the corresponding property value in function arguments.
+    /// If no property value is found using the argument name, the original name - <see cref="RestApiPayloadProperty.Name"/> will be used for the search instead.
+    /// </summary>
+    public string? ArgumentName
+    {
+        get => this._argumentName;
+        set
+        {
+            this._freezable.ThrowIfFrozen();
+            this._argumentName = value;
+        }
+    }
 
     /// <summary>
     /// The property type.
@@ -40,8 +56,7 @@ public sealed class RestApiPayloadProperty
     /// <summary>
     /// The properties.
     /// </summary>
-    public IReadOnlyList<RestApiPayloadProperty> Properties { get; }
-
+    public IList<RestApiPayloadProperty> Properties { get; private set; }
     /// <summary>
     /// The schema of the parameter.
     /// </summary>
@@ -69,7 +84,7 @@ public sealed class RestApiPayloadProperty
         string name,
         string type,
         bool isRequired,
-        IReadOnlyList<RestApiPayloadProperty> properties,
+        IList<RestApiPayloadProperty> properties,
         string? description = null,
         string? format = null,
         KernelJsonSchema? schema = null,
@@ -84,4 +99,20 @@ public sealed class RestApiPayloadProperty
         this.Format = format;
         this.DefaultValue = defaultValue;
     }
+
+    /// <summary>
+    /// Makes the current instance unmodifiable.
+    /// </summary>
+    internal void Freeze()
+    {
+        this.Properties = new ReadOnlyCollection<RestApiPayloadProperty>(this.Properties);
+        foreach (var property in this.Properties)
+        {
+            property.Freeze();
+        }
+
+        this._freezable.Freeze();
+    }
+    private readonly Freezable _freezable = new();
+    private string? _argumentName;
 }

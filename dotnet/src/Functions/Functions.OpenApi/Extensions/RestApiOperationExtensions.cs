@@ -38,10 +38,14 @@ internal static partial class RestApiOperationExtensions
             parameters.AddRange(GetPayloadParameters(operation, addPayloadParamsFromMetadata, enablePayloadNamespacing));
         }
 
-        // Create a property alternative name without special symbols that are not supported by SK template language.
         foreach (var parameter in parameters)
         {
-            parameter.AlternativeName = InvalidSymbolsRegex().Replace(parameter.Name, "_");
+            // The functionality of replacing invalid symbols and setting the argument name   
+            // was introduced to handle dashes allowed in OpenAPI parameter names and   
+            // not supported by SK at that time. More context -   
+            // https://github.com/microsoft/semantic-kernel/pull/283#discussion_r1156286780   
+            // It's kept for backward compatibility only.  
+            parameter.ArgumentName ??= InvalidSymbolsRegex().Replace(parameter.Name, "_");
         }
 
         return parameters;
@@ -69,7 +73,7 @@ internal static partial class RestApiOperationExtensions
     /// <param name="responses">Possible REST API responses.</param>
     /// <param name="preferredResponses">The preferred response codes to use when selecting the default response.</param>
     /// <returns>The default response, if any.</returns>
-    private static RestApiExpectedResponse? GetDefaultResponse(IReadOnlyDictionary<string, RestApiExpectedResponse> responses, string[] preferredResponses)
+    private static RestApiExpectedResponse? GetDefaultResponse(IDictionary<string, RestApiExpectedResponse> responses, string[] preferredResponses)
     {
         foreach (var code in preferredResponses)
         {
@@ -161,7 +165,7 @@ internal static partial class RestApiOperationExtensions
     /// </param>
     /// <param name="rootPropertyName">The root property name.</param>
     /// <returns>The list of payload parameters.</returns>
-    private static List<RestApiParameter> GetParametersFromPayloadMetadata(IReadOnlyList<RestApiPayloadProperty> properties, bool enableNamespacing = false, string? rootPropertyName = null)
+    private static List<RestApiParameter> GetParametersFromPayloadMetadata(IList<RestApiPayloadProperty> properties, bool enableNamespacing = false, string? rootPropertyName = null)
     {
         var parameters = new List<RestApiParameter>();
 
@@ -181,7 +185,10 @@ internal static partial class RestApiOperationExtensions
                     defaultValue: property.DefaultValue,
                     description: property.Description,
                     format: property.Format,
-                    schema: property.Schema));
+                    schema: property.Schema)
+                {
+                    ArgumentName = property.ArgumentName
+                });
             }
 
             parameters.AddRange(GetParametersFromPayloadMetadata(property.Properties, enableNamespacing, parameterName));

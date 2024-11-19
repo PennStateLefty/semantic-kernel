@@ -1,8 +1,8 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Diagnostics.CodeAnalysis;
-using System.Linq;
 
 namespace Microsoft.SemanticKernel.Plugins.OpenApi;
 
@@ -12,6 +12,21 @@ namespace Microsoft.SemanticKernel.Plugins.OpenApi;
 [Experimental("SKEXP0040")]
 public sealed class RestApiServerVariable
 {
+    /// <summary>
+    /// The variable argument name.
+    /// If provided, the argument name will be used to search for the corresponding variable value in function arguments.
+    /// If no property value is found using the argument name, the original name represented by the  <see cref="RestApiServer.Variables"/> dictionary key will be used for the search instead.
+    /// </summary>
+    public string? ArgumentName
+    {
+        get => this._argumentName;
+        set
+        {
+            this._freezable.ThrowIfFrozen();
+            this._argumentName = value;
+        }
+    }
+
     /// <summary>
     /// An optional description for the server variable. CommonMark syntax MAY be used for rich text representation.
     /// </summary>
@@ -26,7 +41,7 @@ public sealed class RestApiServerVariable
     /// <summary>
     /// An enumeration of string values to be used if the substitution options are from a limited set.
     /// </summary>
-    public IReadOnlyList<string>? Enum { get; }
+    public IList<string>? Enum { get; private set; }
 
     /// <summary>
     /// Construct a new <see cref="RestApiServerVariable"/> object.
@@ -34,7 +49,7 @@ public sealed class RestApiServerVariable
     /// <param name="defaultValue">The default value to use for substitution.</param>
     /// <param name="description">An optional description for the server variable.</param>
     /// <param name="enumValues">An enumeration of string values to be used if the substitution options are from a limited set.</param>
-    internal RestApiServerVariable(string defaultValue, string? description = null, List<string>? enumValues = null)
+    internal RestApiServerVariable(string defaultValue, string? description = null, IList<string>? enumValues = null)
     {
         this.Default = defaultValue;
         this.Description = description;
@@ -49,4 +64,13 @@ public sealed class RestApiServerVariable
     {
         return this.Enum?.Contains(value!) ?? true;
     }
+
+    internal void Freeze()
+    {
+        this.Enum = this.Enum is not null ? new ReadOnlyCollection<string>(this.Enum) : null;
+        this._freezable.Freeze();
+    }
+
+    private string? _argumentName;
+    private readonly Freezable _freezable = new();
 }
