@@ -495,3 +495,6 @@ swa-cli.config.json
 
 # python devcontainer
 /python/.devcontainer/*
+
+# kiota workspace files
+**/.kiota
