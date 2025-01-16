@@ -332,7 +332,10 @@ internal partial class ClientCore
                                     callId: functionCallUpdate.ToolCallId,
                                     name: functionCallUpdate.FunctionName,
                                     arguments: streamingArguments,
-                                    functionCallIndex: functionCallUpdate.Index));
+                                    functionCallIndex: functionCallUpdate.Index)
+                                {
+                                    RequestIndex = requestIndex,
+                                });
                             }
                         }
                         streamedContents?.Add(openAIStreamingChatMessageContent);
@@ -370,7 +373,7 @@ internal partial class ClientCore
 
             // Process function calls by invoking the functions and adding the results to the chat history.
             // Each function call will trigger auto-function-invocation filters, which can terminate the process.
-            // In such cases, we'll return the last message in the chat history.  
+            // In such cases, we'll return the last message in the chat history.
             var lastMessage = await this.FunctionCallsProcessor.ProcessFunctionCallsAsync(
                 chatMessageContent,
                 chatHistory,
@@ -688,8 +691,8 @@ internal partial class ClientCore
         {
             var toolCalls = new List<ChatToolCall>();
 
-            // Handling function calls supplied via either:  
-            // ChatCompletionsToolCall.ToolCalls collection items or  
+            // Handling function calls supplied via either:
+            // ChatCompletionsToolCall.ToolCalls collection items or
             // ChatMessageContent.Metadata collection item with 'ChatResponseMessage.FunctionToolCalls' key.
             IEnumerable<ChatToolCall>? tools = (message as OpenAIChatMessageContent)?.ToolCalls;
             if (tools is null && message.Metadata?.TryGetValue(OpenAIChatMessageContent.FunctionToolCallsProperty, out object? toolCallsObject) is true)
@@ -743,7 +746,7 @@ internal partial class ClientCore
             }
 
             // This check is necessary to prevent an exception that will be thrown if the toolCalls collection is empty.
-            // HTTP 400 (invalid_request_error:) [] should be non-empty - 'messages.3.tool_calls'  
+            // HTTP 400 (invalid_request_error:) [] should be non-empty - 'messages.3.tool_calls'
             if (toolCalls.Count == 0)
             {
                 return [new AssistantChatMessage(message.Content) { ParticipantName = message.AuthorName }];
@@ -1020,7 +1023,7 @@ internal partial class ClientCore
 
             foreach (var function in functions)
             {
-                tools.Add(function.Metadata.ToOpenAIFunction().ToFunctionDefinition());
+                tools.Add(function.Metadata.ToOpenAIFunction().ToFunctionDefinition(config?.Options?.AllowStrictSchemaAdherence ?? false));
             }
         }
 
