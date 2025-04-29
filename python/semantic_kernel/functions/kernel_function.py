@@ -92,9 +92,11 @@ class KernelFunction(KernelBaseModel):
 
     metadata: KernelFunctionMetadata
 
-    invocation_duration_histogram: metrics.Histogram = Field(default_factory=_create_function_duration_histogram)
+    invocation_duration_histogram: metrics.Histogram = Field(
+        default_factory=_create_function_duration_histogram, exclude=True
+    )
     streaming_duration_histogram: metrics.Histogram = Field(
-        default_factory=_create_function_streaming_duration_histogram
+        default_factory=_create_function_streaming_duration_histogram, exclude=True
     )
 
     @classmethod
@@ -292,7 +294,9 @@ class KernelFunction(KernelBaseModel):
         if arguments is None:
             arguments = KernelArguments(**kwargs)
         _rebuild_function_invocation_context()
-        function_context = FunctionInvocationContext(function=self, kernel=kernel, arguments=arguments)
+        function_context = FunctionInvocationContext(
+            function=self, kernel=kernel, arguments=arguments, is_streaming=True
+        )
 
         with tracer.start_as_current_span(self.fully_qualified_name) as current_span:
             KernelFunctionLogMessages.log_function_streaming_invoking(logger, self.fully_qualified_name)

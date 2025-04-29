@@ -3,29 +3,33 @@
 import logging
 import sys
 from collections.abc import AsyncIterable
-from typing import Any, ClassVar
-
-from semantic_kernel.agents.agent import Agent
-from semantic_kernel.contents.chat_message_content import ChatMessageContent
-from semantic_kernel.contents.streaming_chat_message_content import StreamingChatMessageContent
-from semantic_kernel.contents.utils.author_role import AuthorRole
-from semantic_kernel.exceptions.agent_exceptions import AgentChatException
+from typing import TYPE_CHECKING, Any, ClassVar
 
 if sys.version_info >= (3, 12):
     from typing import override  # pragma: no cover
 else:
     from typing_extensions import override  # pragma: no cover
 
+from semantic_kernel.agents.agent import Agent
 from semantic_kernel.agents.channels.agent_channel import AgentChannel
 from semantic_kernel.contents.chat_history import ChatHistory
-from semantic_kernel.utils.experimental_decorator import experimental_class
+from semantic_kernel.contents.chat_message_content import ChatMessageContent
+from semantic_kernel.contents.streaming_chat_message_content import StreamingChatMessageContent
+from semantic_kernel.contents.utils.author_role import AuthorRole
+from semantic_kernel.exceptions.agent_exceptions import AgentChatException
+from semantic_kernel.utils.feature_stage_decorator import experimental
+
+if TYPE_CHECKING:
+    from semantic_kernel.agents.bedrock.bedrock_agent import BedrockAgentThread
 
 logger = logging.getLogger(__name__)
 
 
-@experimental_class
+@experimental
 class BedrockAgentChannel(AgentChannel, ChatHistory):
     """An AgentChannel for a BedrockAgent that is based on a ChatHistory.
+
+    The chat history will override the session state when invoking the agent.
 
     This channel allows Bedrock agents to interact with other types of agents in Semantic Kernel in an AgentGroupChat.
     However, since Bedrock agents require the chat history to alternate between user and agent messages, this channel
@@ -34,14 +38,16 @@ class BedrockAgentChannel(AgentChannel, ChatHistory):
     alternates between user and agent messages.
     """
 
+    thread: "BedrockAgentThread"
     MESSAGE_PLACEHOLDER: ClassVar[str] = "[SILENCE]"
 
     @override
-    async def invoke(self, agent: "Agent") -> AsyncIterable[tuple[bool, ChatMessageContent]]:
+    async def invoke(self, agent: "Agent", **kwargs: Any) -> AsyncIterable[tuple[bool, ChatMessageContent]]:
         """Perform a discrete incremental interaction between a single Agent and AgentChat.
 
         Args:
             agent: The agent to interact with.
+            kwargs: Additional keyword arguments.
 
         Returns:
             An async iterable of ChatMessageContent with a boolean indicating if the
@@ -57,30 +63,31 @@ class BedrockAgentChannel(AgentChannel, ChatHistory):
             raise AgentChatException("No chat history available.")
 
         # Preprocess chat history
-        self._ensure_history_alternates()
-        self._ensure_last_message_is_user()
+        await self._ensure_history_alternates()
+        await self._ensure_last_message_is_user()
 
-        session_id = BedrockAgent.create_session_id()
-        async for message in agent.invoke(
-            session_id,
-            self.messages[-1].content,
-            sessionState=self._parse_chat_history_to_session_state(),
+        async for response in agent.invoke(
+            messages=self.messages[-1].content,
+            thread=self.thread,
+            sessionState=await self._parse_chat_history_to_session_state(),
         ):
-            self.messages.append(message)
             # All messages from Bedrock agents are user facing, i.e., function calls are not returned as messages
-            yield True, message
+            self.messages.append(response.message)
+            yield True, response.message
 
     @override
     async def invoke_stream(
         self,
         agent: "Agent",
         messages: list[ChatMessageContent],
+        **kwargs: Any,
     ) -> AsyncIterable[ChatMessageContent]:
         """Perform a streaming interaction between a single Agent and AgentChat.
 
         Args:
             agent: The agent to interact with.
             messages: The history of messages in the conversation.
+            kwargs: Additional keyword arguments.
 
         Returns:
             An async iterable of ChatMessageContent.
@@ -93,18 +100,17 @@ class BedrockAgentChannel(AgentChannel, ChatHistory):
             raise AgentChatException("No chat history available.")
 
         # Preprocess chat history
-        self._ensure_history_alternates()
-        self._ensure_last_message_is_user()
+        await self._ensure_history_alternates()
+        await self._ensure_last_message_is_user()
 
-        session_id = BedrockAgent.create_session_id()
         full_message: list[StreamingChatMessageContent] = []
-        async for message_chunk in agent.invoke_stream(
-            session_id,
-            self.messages[-1].content,
-            sessionState=self._parse_chat_history_to_session_state(),
+        async for response_chunk in agent.invoke_stream(
+            messages=self.messages[-1].content,
+            thread=self.thread,
+            sessionState=await self._parse_chat_history_to_session_state(),
         ):
-            yield message_chunk
-            full_message.append(message_chunk)
+            yield response_chunk.message
+            full_message.append(response_chunk.message)
 
         messages.append(
             ChatMessageContent(
@@ -161,7 +167,7 @@ class BedrockAgentChannel(AgentChannel, ChatHistory):
 
     # region chat history preprocessing and parsing
 
-    def _ensure_history_alternates(self):
+    async def _ensure_history_alternates(self):
         """Ensure that the chat history alternates between user and agent messages."""
         if not self.messages or len(self.messages) == 1:
             return
@@ -182,7 +188,7 @@ class BedrockAgentChannel(AgentChannel, ChatHistory):
             else:
                 current_index += 1
 
-    def _ensure_last_message_is_user(self):
+    async def _ensure_last_message_is_user(self):
         """Ensure that the last message in the chat history is a user message."""
         if self.messages and self.messages[-1].role == AuthorRole.ASSISTANT:
             self.messages.append(
@@ -192,7 +198,7 @@ class BedrockAgentChannel(AgentChannel, ChatHistory):
                 )
             )
 
-    def _parse_chat_history_to_session_state(self) -> dict[str, Any]:
+    async def _parse_chat_history_to_session_state(self) -> dict[str, Any]:
         """Parse the chat history to a session state."""
         session_state: dict[str, Any] = {"conversationHistory": {"messages": []}}
         if len(self.messages) > 1:

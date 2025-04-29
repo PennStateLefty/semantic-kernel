@@ -148,21 +148,21 @@ public sealed class GeminiChatCompletionTests(ITestOutputHelper output) : TestsB
 
         // Setup initial cached content
         var cachedContentJson = File.ReadAllText(Path.Combine("Resources", "gemini_cached_content.json"))
-            .Replace("{{project}}", this.VertexAIGetProjectId())
-            .Replace("{{location}}", this.VertexAIGetLocation())
-            .Replace("{{model}}", this.VertexAIGetGeminiModel());
+            .Replace("{{project}}", this.VertexAI.ProjectId!)
+            .Replace("{{location}}", this.VertexAI.Location!)
+            .Replace("{{model}}", this.VertexAI.Gemini.ModelId!);
 
         var cachedContentName = string.Empty;
 
         using (var httpClient = new HttpClient()
         {
-            DefaultRequestHeaders = { Authorization = new("Bearer", this.VertexAIGetBearerKey()) }
+            DefaultRequestHeaders = { Authorization = new("Bearer", this.VertexAI.BearerKey) }
         })
         {
             using (var content = new StringContent(cachedContentJson, Encoding.UTF8, "application/json"))
             {
                 using (var httpResponse = await httpClient.PostAsync(
-                new Uri($"https://{this.VertexAIGetLocation()}-aiplatform.googleapis.com/v1beta1/projects/{this.VertexAIGetProjectId()}/locations/{this.VertexAIGetLocation()}/cachedContents"),
+                new Uri($"https://{this.VertexAI.Location}-aiplatform.googleapis.com/v1beta1/projects/{this.VertexAI.ProjectId!}/locations/{this.VertexAI.Location}/cachedContents"),
                 content))
                 {
                     httpResponse.EnsureSuccessStatusCode();
@@ -577,5 +577,27 @@ public sealed class GeminiChatCompletionTests(ITestOutputHelper output) : TestsB
         Assert.NotNull(geminiMetadata);
         this.Output.WriteLine($"ResponseSafetyRatings: {JsonSerializer.Serialize(geminiMetadata.ResponseSafetyRatings)}");
         Assert.NotNull(geminiMetadata.ResponseSafetyRatings);
+    }
+
+    [RetryFact(Skip = "This test is for manual verification.")]
+    public async Task GoogleAIChatReturnsResponseWorksWithThinkingBudgetAsync()
+    {
+        // Arrange
+        var modelId = "gemini-2.5-pro-exp-03-25";
+        var chatHistory = new ChatHistory();
+        chatHistory.AddUserMessage("Hello, I'm Brandon, how are you?");
+        chatHistory.AddAssistantMessage("I'm doing well, thanks for asking.");
+        chatHistory.AddUserMessage("Call me by my name and expand this abbreviation: LLM");
+
+        var sut = this.GetChatService(ServiceType.GoogleAI, isBeta: true, overrideModelId: modelId);
+        var settings = new GeminiPromptExecutionSettings { ThinkingConfig = new() { ThinkingBudget = 2000 } };
+
+        // Act
+        var streamResponses = await sut.GetStreamingChatMessageContentsAsync(chatHistory, settings).ToListAsync();
+        var responses = await sut.GetChatMessageContentsAsync(chatHistory, settings);
+
+        // Assert
+        Assert.NotNull(streamResponses[0].Content);
+        Assert.NotNull(responses[0].Content);
     }
 }

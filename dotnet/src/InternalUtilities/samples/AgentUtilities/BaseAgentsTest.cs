@@ -1,19 +1,28 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
-using System.ClientModel;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using Azure.AI.Projects;
-using Azure.Identity;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Agents;
-using Microsoft.SemanticKernel.Agents.AzureAI;
 using Microsoft.SemanticKernel.Agents.OpenAI;
 using Microsoft.SemanticKernel.ChatCompletion;
 using OpenAI.Assistants;
 using OpenAI.Files;
 
 using ChatTokenUsage = OpenAI.Chat.ChatTokenUsage;
+
+/// <summary>
+/// Base class for samples that demonstrate the usage of host agents
+/// based on API's such as Open AI Assistants or Azure AI Agents.
+/// </summary>
+public abstract class BaseAgentsTest<TClient>(ITestOutputHelper output) : BaseAgentsTest(output)
+{
+    /// <summary>
+    /// Gets the root client for the service.
+    /// </summary>
+    protected abstract TClient Client { get; }
+}
 
 /// <summary>
 /// Base class for samples that demonstrate the usage of agents.
@@ -23,44 +32,21 @@ public abstract class BaseAgentsTest(ITestOutputHelper output) : BaseTest(output
     /// <summary>
     /// Metadata key to indicate the assistant as created for a sample.
     /// </summary>
-    protected const string AssistantSampleMetadataKey = "sksample";
-
-    protected override bool ForceOpenAI => true;
+    protected const string SampleMetadataKey = "sksample";
 
     /// <summary>
-    /// Metadata to indicate the assistant as created for a sample.
+    /// Metadata to indicate the object was created for a sample.
     /// </summary>
     /// <remarks>
-    /// While the samples do attempt delete the assistants it creates, it is possible
-    /// that some assistants may remain.  This metadata can be used to identify and sample
-    /// agents for clean-up.
+    /// While the samples do attempt delete the objects it creates, it is possible
+    /// that some may remain.  This metadata can be used to identify and sample
+    /// objects for manual clean-up.
     /// </remarks>
-    protected static readonly ReadOnlyDictionary<string, string> AssistantSampleMetadata =
+    protected static readonly ReadOnlyDictionary<string, string> SampleMetadata =
         new(new Dictionary<string, string>
         {
-            { AssistantSampleMetadataKey, bool.TrueString }
+            { SampleMetadataKey, bool.TrueString }
         });
-
-    /// <summary>
-    /// Provide a <see cref="OpenAIClientProvider"/> according to the configuration settings.
-    /// </summary>
-    protected AzureAIClientProvider GetAzureProvider()
-    {
-        return AzureAIClientProvider.FromConnectionString(TestConfiguration.AzureAI.ConnectionString, new AzureCliCredential());
-    }
-
-    /// <summary>
-    /// Provide a <see cref="OpenAIClientProvider"/> according to the configuration settings.
-    /// </summary>
-    protected OpenAIClientProvider GetClientProvider()
-    {
-        return
-            this.UseOpenAIConfig ?
-                OpenAIClientProvider.ForOpenAI(new ApiKeyCredential(this.ApiKey ?? throw new ConfigurationNotFoundException("OpenAI:ApiKey"))) :
-                !string.IsNullOrWhiteSpace(this.ApiKey) ?
-                    OpenAIClientProvider.ForAzureOpenAI(new ApiKeyCredential(this.ApiKey), new Uri(this.Endpoint!)) :
-                    OpenAIClientProvider.ForAzureOpenAI(new AzureCliCredential(), new Uri(this.Endpoint!));
-    }
 
     /// <summary>
     /// Common method to write formatted agent chat content to the console.

@@ -498,3 +498,6 @@ swa-cli.config.json
 
 # kiota workspace files
 **/.kiota
+
+# dapr extension files
+**/dapr.yaml

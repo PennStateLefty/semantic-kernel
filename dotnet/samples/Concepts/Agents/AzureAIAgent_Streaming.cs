@@ -2,6 +2,7 @@
 using System.ComponentModel;
 using Azure.AI.Projects;
 using Microsoft.SemanticKernel;
+using Microsoft.SemanticKernel.Agents;
 using Microsoft.SemanticKernel.Agents.AzureAI;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Agent = Azure.AI.Projects.Agent;
@@ -11,7 +12,7 @@ namespace Agents;
 /// <summary>
 /// Demonstrate consuming "streaming" message for <see cref="AzureAIAgent"/>.
 /// </summary>
-public class AzureAIAgent_Streaming(ITestOutputHelper output) : BaseAgentsTest(output)
+public class AzureAIAgent_Streaming(ITestOutputHelper output) : BaseAzureAgentTest(output)
 {
     [Fact]
     public async Task UseStreamingAgentAsync()
@@ -20,25 +21,23 @@ public class AzureAIAgent_Streaming(ITestOutputHelper output) : BaseAgentsTest(o
         const string AgentInstructions = "Repeat the user message in the voice of a pirate and then end with a parrot sound.";
 
         // Define the agent
-        AzureAIClientProvider clientProvider = this.GetAzureProvider();
-        AgentsClient client = clientProvider.Client.GetAgentsClient();
-        Agent definition = await client.CreateAgentAsync(
+        Agent definition = await this.AgentsClient.CreateAgentAsync(
             TestConfiguration.AzureAI.ChatModelId,
             AgentName,
             null,
             AgentInstructions);
-        AzureAIAgent agent = new(definition, clientProvider);
+        AzureAIAgent agent = new(definition, this.AgentsClient);
 
         // Create a thread for the agent conversation.
-        AgentThread thread = await client.CreateThreadAsync(metadata: AssistantSampleMetadata);
+        AzureAIAgentThread agentThread = new(this.AgentsClient, metadata: SampleMetadata);
 
         // Respond to user input
-        await InvokeAgentAsync(agent, thread.Id, "Fortune favors the bold.");
-        await InvokeAgentAsync(agent, thread.Id, "I came, I saw, I conquered.");
-        await InvokeAgentAsync(agent, thread.Id, "Practice makes perfect.");
+        await InvokeAgentAsync(agent, agentThread, "Fortune favors the bold.");
+        await InvokeAgentAsync(agent, agentThread, "I came, I saw, I conquered.");
+        await InvokeAgentAsync(agent, agentThread, "Practice makes perfect.");
 
         // Output the entire chat history
-        await DisplayChatHistoryAsync(agent, thread.Id);
+        await DisplayChatHistoryAsync(agentThread);
     }
 
     [Fact]
@@ -48,31 +47,26 @@ public class AzureAIAgent_Streaming(ITestOutputHelper output) : BaseAgentsTest(o
         const string AgentInstructions = "Answer questions about the menu.";
 
         // Define the agent
-        AzureAIClientProvider clientProvider = this.GetAzureProvider();
-        AgentsClient client = clientProvider.Client.GetAgentsClient();
-        Agent definition = await client.CreateAgentAsync(
+        Agent definition = await this.AgentsClient.CreateAgentAsync(
             TestConfiguration.AzureAI.ChatModelId,
             AgentName,
             null,
             AgentInstructions);
-        AzureAIAgent agent = new(definition, clientProvider)
-        {
-            Kernel = new Kernel(),
-        };
+        AzureAIAgent agent = new(definition, this.AgentsClient);
 
         // Initialize plugin and add to the agent's Kernel (same as direct Kernel usage).
         KernelPlugin plugin = KernelPluginFactory.CreateFromType<MenuPlugin>();
         agent.Kernel.Plugins.Add(plugin);
 
         // Create a thread for the agent conversation.
-        AgentThread thread = await client.CreateThreadAsync(metadata: AssistantSampleMetadata);
+        AzureAIAgentThread agentThread = new(this.AgentsClient, metadata: SampleMetadata);
 
         // Respond to user input
-        await InvokeAgentAsync(agent, thread.Id, "What is the special soup and its price?");
-        await InvokeAgentAsync(agent, thread.Id, "What is the special drink and its price?");
+        await InvokeAgentAsync(agent, agentThread, "What is the special soup and its price?");
+        await InvokeAgentAsync(agent, agentThread, "What is the special drink and its price?");
 
         // Output the entire chat history
-        await DisplayChatHistoryAsync(agent, thread.Id);
+        await DisplayChatHistoryAsync(agentThread);
     }
 
     [Fact]
@@ -82,42 +76,42 @@ public class AzureAIAgent_Streaming(ITestOutputHelper output) : BaseAgentsTest(o
         const string AgentInstructions = "Solve math problems with code.";
 
         // Define the agent
-        AzureAIClientProvider clientProvider = this.GetAzureProvider();
-        AgentsClient client = clientProvider.Client.GetAgentsClient();
-        Agent definition = await client.CreateAgentAsync(
+        Agent definition = await this.AgentsClient.CreateAgentAsync(
             TestConfiguration.AzureAI.ChatModelId,
             AgentName,
             null,
             AgentInstructions,
             [new CodeInterpreterToolDefinition()]);
-        AzureAIAgent agent = new(definition, clientProvider)
-        {
-            Kernel = new Kernel(),
-        };
+        AzureAIAgent agent = new(definition, this.AgentsClient);
 
         // Create a thread for the agent conversation.
-        AgentThread thread = await client.CreateThreadAsync(metadata: AssistantSampleMetadata);
+        AzureAIAgentThread agentThread = new(this.AgentsClient, metadata: SampleMetadata);
 
         // Respond to user input
-        await InvokeAgentAsync(agent, thread.Id, "Is 191 a prime number?");
-        await InvokeAgentAsync(agent, thread.Id, "Determine the values in the Fibonacci sequence that that are less then the value of 101");
+        await InvokeAgentAsync(agent, agentThread, "Is 191 a prime number?");
+        await InvokeAgentAsync(agent, agentThread, "Determine the values in the Fibonacci sequence that that are less then the value of 101");
 
         // Output the entire chat history
-        await DisplayChatHistoryAsync(agent, thread.Id);
+        await DisplayChatHistoryAsync(agentThread);
     }
 
     // Local function to invoke agent and display the conversation messages.
-    private async Task InvokeAgentAsync(AzureAIAgent agent, string threadId, string input)
+    private async Task InvokeAgentAsync(AzureAIAgent agent, Microsoft.SemanticKernel.Agents.AgentThread agentThread, string input)
     {
         ChatMessageContent message = new(AuthorRole.User, input);
-        await agent.AddChatMessageAsync(threadId, message);
         this.WriteAgentChatMessage(message);
 
+        // For this sample, also capture fully formed messages so we can display them later.
         ChatHistory history = [];
+        Task OnNewMessage(ChatMessageContent message)
+        {
+            history.Add(message);
+            return Task.CompletedTask;
+        }
 
         bool isFirst = false;
         bool isCode = false;
-        await foreach (StreamingChatMessageContent response in agent.InvokeStreamingAsync(threadId, messages: history))
+        await foreach (StreamingChatMessageContent response in agent.InvokeStreamingAsync(message, agentThread, new AgentInvokeOptions() { OnIntermediateMessage = OnNewMessage }))
         {
             if (string.IsNullOrEmpty(response.Content))
             {
@@ -152,13 +146,13 @@ public class AzureAIAgent_Streaming(ITestOutputHelper output) : BaseAgentsTest(o
         }
     }
 
-    private async Task DisplayChatHistoryAsync(AzureAIAgent agent, string threadId)
+    private async Task DisplayChatHistoryAsync(AzureAIAgentThread agentThread)
     {
         Console.WriteLine("================================");
         Console.WriteLine("CHAT HISTORY");
         Console.WriteLine("================================");
 
-        ChatMessageContent[] messages = await agent.GetThreadMessagesAsync(threadId).ToArrayAsync();
+        ChatMessageContent[] messages = await agentThread.GetMessagesAsync().ToArrayAsync();
         for (int index = messages.Length - 1; index >= 0; --index)
         {
             this.WriteAgentChatMessage(messages[index]);

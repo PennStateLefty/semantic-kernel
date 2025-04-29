@@ -1,6 +1,7 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -15,6 +16,7 @@ namespace Microsoft.SemanticKernel.Agents;
 /// <summary>
 /// Represents an <see cref="AgentChat"/> that supports multi-turn interactions.
 /// </summary>
+[Experimental("SKEXP0110")]
 public sealed class AgentGroupChat : AgentChat
 {
     private readonly HashSet<string> _agentIds; // Efficient existence test O(1) vs O(n) for list.
@@ -42,7 +44,7 @@ public sealed class AgentGroupChat : AgentChat
     /// <summary>
     /// Add an <see cref="Agent"/> to the chat.
     /// </summary>
-    /// <param name="agent">The <see cref="KernelAgent"/> to add.</param>
+    /// <param name="agent">The <see cref="Agent"/> to add.</param>
     public void AddAgent(Agent agent)
     {
         if (this._agentIds.Add(agent.Id))
@@ -190,7 +192,7 @@ public sealed class AgentGroupChat : AgentChat
     /// </summary>
     /// <param name="template">The prompt template string that defines the prompt.</param>
     /// <param name="templateFactory">
-    /// On optional <see cref="IPromptTemplateFactory"/> to use when interpreting the <paramref name="template"/>.
+    /// An optional <see cref="IPromptTemplateFactory"/> to use when interpreting the <paramref name="template"/>.
     /// The default factory is used when none is provided.
     /// </param>
     /// <param name="safeParameterNames">The parameter names to exclude from being HTML encoded.</param>

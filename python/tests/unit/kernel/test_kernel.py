@@ -1,6 +1,8 @@
 # Copyright (c) Microsoft. All rights reserved.
 
 import os
+from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Union
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -10,6 +12,7 @@ import pytest
 from semantic_kernel import Kernel
 from semantic_kernel.connectors.ai.chat_completion_client_base import ChatCompletionClientBase
 from semantic_kernel.connectors.ai.function_choice_behavior import FunctionChoiceBehavior
+from semantic_kernel.connectors.ai.open_ai.services.open_ai_chat_completion import OpenAIChatCompletion
 from semantic_kernel.connectors.ai.prompt_execution_settings import PromptExecutionSettings
 from semantic_kernel.const import METADATA_EXCEPTION_KEY
 from semantic_kernel.contents import ChatMessageContent
@@ -25,6 +28,7 @@ from semantic_kernel.exceptions.kernel_exceptions import (
     OperationCancelledException,
 )
 from semantic_kernel.exceptions.template_engine_exceptions import TemplateSyntaxError
+from semantic_kernel.filters.filter_types import FilterTypes
 from semantic_kernel.functions.function_result import FunctionResult
 from semantic_kernel.functions.kernel_arguments import KernelArguments
 from semantic_kernel.functions.kernel_function import KernelFunction
@@ -283,12 +287,12 @@ async def test_invoke_function_call(kernel: Kernel, get_tool_call_mock):
         patch("semantic_kernel.kernel.Kernel.get_list_of_function_metadata", return_value=[func_meta]),
     ):
         await kernel.invoke_function_call(
-            tool_call_mock,
-            chat_history_mock,
-            arguments,
-            1,
-            0,
-            FunctionChoiceBehavior.Auto(filters={"included_functions": ["function"]}),
+            function_call=tool_call_mock,
+            chat_history=chat_history_mock,
+            arguments=arguments,
+            function_call_count=1,
+            request_index=0,
+            function_behavior=FunctionChoiceBehavior.Auto(filters={"included_functions": ["function"]}),
         )
 
 
@@ -314,12 +318,12 @@ async def test_invoke_function_call_throws_during_invoke(kernel: Kernel, get_too
         patch("semantic_kernel.kernel.Kernel.get_function", return_value=func_mock),
     ):
         await kernel.invoke_function_call(
-            tool_call_mock,
-            chat_history_mock,
-            arguments,
-            1,
-            0,
-            FunctionChoiceBehavior.Auto(),
+            function_call=tool_call_mock,
+            chat_history=chat_history_mock,
+            arguments=arguments,
+            function_call_count=1,
+            request_index=0,
+            function_behavior=FunctionChoiceBehavior.Auto(),
         )
 
 
@@ -340,12 +344,12 @@ async def test_invoke_function_call_non_allowed_func_throws(kernel: Kernel, get_
 
     with patch("semantic_kernel.kernel.logger", autospec=True):
         await kernel.invoke_function_call(
-            tool_call_mock,
-            chat_history_mock,
-            arguments,
-            1,
-            0,
-            FunctionChoiceBehavior.Auto(filters={"included_functions": ["unknown"]}),
+            function_call=tool_call_mock,
+            chat_history=chat_history_mock,
+            arguments=arguments,
+            function_call_count=1,
+            request_index=0,
+            function_behavior=FunctionChoiceBehavior.Auto(filters={"included_functions": ["unknown"]}),
         )
 
 
@@ -369,12 +373,12 @@ async def test_invoke_function_call_no_name_throws(kernel: Kernel, get_tool_call
         patch("semantic_kernel.kernel.logger", autospec=True),
     ):
         await kernel.invoke_function_call(
-            tool_call_mock,
-            chat_history_mock,
-            arguments,
-            1,
-            0,
-            FunctionChoiceBehavior.Auto(),
+            function_call=tool_call_mock,
+            chat_history=chat_history_mock,
+            arguments=arguments,
+            function_call_count=1,
+            request_index=0,
+            function_behavior=FunctionChoiceBehavior.Auto(),
         )
 
 
@@ -400,12 +404,12 @@ async def test_invoke_function_call_not_enough_parsed_args(kernel: Kernel, get_t
         patch("semantic_kernel.kernel.Kernel.get_function", return_value=func_mock),
     ):
         await kernel.invoke_function_call(
-            tool_call_mock,
-            chat_history_mock,
-            arguments,
-            1,
-            0,
-            FunctionChoiceBehavior.Auto(),
+            function_call=tool_call_mock,
+            chat_history=chat_history_mock,
+            arguments=arguments,
+            function_call_count=1,
+            request_index=0,
+            function_behavior=FunctionChoiceBehavior.Auto(),
         )
 
 
@@ -435,12 +439,12 @@ async def test_invoke_function_call_with_continuation_on_malformed_arguments(ker
 
     with patch("semantic_kernel.kernel.logger", autospec=True) as logger_mock:
         await kernel.invoke_function_call(
-            tool_call_mock,
-            chat_history_mock,
-            arguments,
-            1,
-            0,
-            FunctionChoiceBehavior.Auto(),
+            function_call=tool_call_mock,
+            chat_history=chat_history_mock,
+            arguments=arguments,
+            function_call_count=1,
+            request_index=0,
+            function_behavior=FunctionChoiceBehavior.Auto(),
         )
 
     logger_mock.info.assert_any_call(
@@ -479,9 +483,18 @@ def test_plugin_no_plugin(kernel: Kernel):
         kernel.add_plugin(plugin_name="test")
 
 
-def test_plugin_name_error(kernel: Kernel):
-    with pytest.raises(ValueError):
-        kernel.add_plugin(" ", None)
+def test_plugin_name_from_class_name(kernel: Kernel):
+    kernel.add_plugin(" ", None)
+    assert "str" in kernel.plugins
+
+
+def test_plugin_name_from_name_attribute(kernel: Kernel):
+    @dataclass
+    class TestPlugin:
+        name: str = "test_plugin"
+
+    kernel.add_plugin(TestPlugin(), None)
+    assert "test_plugin" in kernel.plugins
 
 
 def test_plugin_name_not_string_error(kernel: Kernel):
@@ -761,7 +774,101 @@ def test_instantiate_prompt_execution_settings_through_kernel(kernel_with_servic
 def test_experimental_class_has_decorator_and_flag(experimental_plugin_class):
     assert hasattr(experimental_plugin_class, "is_experimental")
     assert experimental_plugin_class.is_experimental
-    assert "This class is experimental and may change in the future." in experimental_plugin_class.__doc__
+    assert "This class is marked as 'experimental' and may change in the future" in experimental_plugin_class.__doc__
+
+
+# endregion
+
+# region copy and clone
+
+
+def test_kernel_model_dump(
+    kernel: Kernel,
+    custom_plugin_class: type,
+    auto_function_invocation_filter: Callable,
+):
+    kernel.add_plugin(custom_plugin_class(), "TestPlugin")
+    kernel.add_filter(FilterTypes.AUTO_FUNCTION_INVOCATION, auto_function_invocation_filter)
+
+    kernel_dict = kernel.model_dump()
+
+    assert kernel_dict is not None
+    assert kernel_dict["plugins"] is not None and len(kernel_dict["plugins"]) > 0
+    assert (
+        kernel_dict["auto_function_invocation_filters"] is not None
+        and len(kernel_dict["auto_function_invocation_filters"]) > 0
+    )
+
+
+def test_kernel_deep_copy(
+    kernel: Kernel,
+    custom_plugin_class: type,
+    auto_function_invocation_filter: Callable,
+):
+    kernel.add_plugin(custom_plugin_class(), "TestPlugin")
+    kernel.add_filter(FilterTypes.AUTO_FUNCTION_INVOCATION, auto_function_invocation_filter)
+
+    kernel_copy = kernel.model_copy(deep=True)
+
+    assert kernel_copy is not None
+    assert kernel_copy.plugins is not None and len(kernel_copy.plugins) > 0
+    assert (
+        kernel_copy.auto_function_invocation_filters is not None
+        and len(kernel_copy.auto_function_invocation_filters) > 0
+    )
+
+
+def test_kernel_model_dump_fail_with_services(kernel: Kernel):
+    open_ai_chat_completion = OpenAIChatCompletion(ai_model_id="abc", api_key="abc")
+    kernel.add_service(open_ai_chat_completion)
+
+    with pytest.raises(TypeError):
+        # This will fail because OpenAIChatCompletion is not serializable, more specifically,
+        # the client is not serializable
+        kernel.model_dump(deep=True)
+
+
+def test_kernel_deep_copy_fail_with_services(kernel: Kernel):
+    open_ai_chat_completion = OpenAIChatCompletion(ai_model_id="abc", api_key="abc")
+    kernel.add_service(open_ai_chat_completion)
+
+    with pytest.raises(TypeError):
+        # This will fail because OpenAIChatCompletion is not serializable, more specifically,
+        # the client is not serializable
+        kernel.model_copy(deep=True)
+
+
+def test_kernel_clone(
+    kernel: Kernel,
+    custom_plugin_class: type,
+    auto_function_invocation_filter: Callable,
+):
+    kernel.add_service(OpenAIChatCompletion(ai_model_id="abc", api_key="abc"))
+    kernel.add_plugin(custom_plugin_class(), "TestPlugin")
+    kernel.add_filter(FilterTypes.AUTO_FUNCTION_INVOCATION, auto_function_invocation_filter)
+
+    kernel_clone = kernel.clone()
+
+    # Assert the clone has all the same properties as the original kernel
+    assert kernel_clone is not None
+    assert kernel_clone.plugins is not None and len(kernel_clone.plugins) > 0
+    assert (
+        kernel_clone.auto_function_invocation_filters is not None
+        and len(kernel_clone.auto_function_invocation_filters) > 0
+    )
+    assert kernel_clone.services is not None and len(kernel_clone.services) > 0
+
+    # Assert the clone is a deep copy
+    kernel_clone.plugins["TestPlugin"].functions["getLightStatus"].metadata.name = "getLightStatus2"
+    assert kernel.plugins["TestPlugin"].functions["getLightStatus"].metadata.name == "getLightStatus"
+
+    kernel_clone.plugins.clear()
+    kernel_clone.remove_filter(filter_type=FilterTypes.AUTO_FUNCTION_INVOCATION, position=0)
+    kernel_clone.remove_all_services()
+
+    assert kernel.plugins is not None and len(kernel.plugins) > 0
+    assert kernel.auto_function_invocation_filters is not None and len(kernel.auto_function_invocation_filters) > 0
+    assert kernel.services is not None and len(kernel.services) > 0
 
 
 # endregion
