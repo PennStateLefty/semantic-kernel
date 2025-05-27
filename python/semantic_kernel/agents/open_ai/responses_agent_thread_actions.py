@@ -526,7 +526,6 @@ class ResponsesAgentThreadActions:
         polling_options: "RunPollingOptions",
     ):
         count = 0
-        print(f"Response status: {response.status}")
         while response.status != "completed":
             await asyncio.sleep(polling_options.get_polling_interval(count).total_seconds())
             response = await agent.client.responses.retrieve(response.id)
@@ -790,7 +789,7 @@ class ResponsesAgentThreadActions:
             name=name,
             role=AuthorRole(role_str),
             items=items,
-            status=Status(response.status),
+            status=Status(response.status) if hasattr(response, "status") else None,
         )
 
     @classmethod
@@ -813,7 +812,7 @@ class ResponsesAgentThreadActions:
             metadata=metadata,
             role=AuthorRole(role_str),
             items=items,
-            status=Status(response.status),
+            status=Status(response.status) if hasattr(response, "status") else None,
         )
 
     @classmethod
